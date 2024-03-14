@@ -1,74 +1,74 @@
 import streamlit as st
-import pandas as pd
-
-def toilet_feedback_app():
-    st.title("Toilet Feedback App")
-
-    # Feedback items
-    feedback_items = [
-        {"name": "Good Job", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/October2021/GxlYdyumoDYAIjmSayjc.png"},
-        {"name": "Urinal", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/VLTmai1Tjl5KKGpKdnKp.png"},
-        {"name": "Mirror", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/yxd7fYZd4ooTaMxICnQQ.png"},
-        {"name": "Basin", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/dg88RUaKf0ywy921KeBy.png"},
-        {"name": "Litter Bin", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/eMQDTjnf48vRbZ2TuSm8.png"},
-        {"name": "Floor", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/XJMqgHyiuK9hh4zdBed0.png"},
-        {"name": "Smell", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/vRXzkR43rs6yZ0DsEXMQ.png"},
-        {"name": "Soap", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/bwjRTWyMrCrYv5Pf8Kln.png"},
-        {"name": "Wall", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/ExIW908QV3U1JDNMszbt.png"},
-        {"name": "Toilet Roll", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/pw9jKgwgR8SZHYEFdPM4.png"},
-        {"name": "Hand Dryer", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/January2022/odRzC9x8USQpZbiHhGjm.png"},
-        {"name": "Toilet Bowl", "image": "https://simpple-resources.s3.ap-southeast-1.amazonaws.com/feedback-items/August2021/6SuBc6H08atZNnf6mkqY.png"}
-    ]
-
-    # Display the checkbox list in a 4x3 grid layout
-    num_columns = 4
-    num_rows = 3
-    grid_items = [feedback_items[i:i + num_columns] for i in range(0, len(feedback_items), num_columns)]
-
-    # Add input fields for name and general feedback
-    user_name = st.text_input("Your Name")
-    general_feedback = st.text_area("General Feedback")
-
-    selected_feedback = {}
-
-    for row in grid_items:
-        cols = st.columns(num_columns)
-        for col, item in zip(cols, row):
-            # Use HTML tags to wrap the checkbox and image in a box
-            col.write(
-                f'<div style="border: 2px solid #ccc; padding: 10px; text-align: center;">'
-                f'<img src="{item["image"]}" alt="{item["name"]}" width="100" height="100">'
-                f'<br>'
-                f'<label>{item["name"]}</label>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-
-            # Store the checkbox state
-            selected_feedback[item["name"]] = col.checkbox(item["name"], key=item["name"])
-
-    # Button to submit feedback
-    if st.button("Submit Feedback"):
-        # Here, you can store the feedback in a database or process it differently
-
-        # Display the feedback data after the user clicks "Submit Feedback"
-        st.subheader("Feedback Data Submitted:")
-
-        # Get the list of selected feedback items
-        selected_items = [item["name"] for item in feedback_items if selected_feedback.get(item["name"])]
-
-        # Create a DataFrame from the selected feedback data
-        feedback_data = {
-            "Name": [user_name],
-            "General Feedback": [general_feedback],
-            "Feedback": [", ".join(selected_items)],
+import fitz  # PyMuPDF
+import streamlit as st
+st.set_page_config(layout="wide")
+custom_css = """
+    <style>
+        .stApp {
+            max-width: 100%;
         }
-        df = pd.DataFrame(feedback_data)
+    </style>
+"""
 
-        # Display the DataFrame
-        st.table(df)
+st.markdown(custom_css, unsafe_allow_html=True)
+# Khởi tạo session state cho danh sách file đã upload nếu chưa có
+if 'uploaded_files' not in st.session_state:
+    st.session_state['uploaded_files'] = []
 
-        st.success("Feedback submitted successfully!")
+def upload_file(uploaded_file):
+    if uploaded_file is not None:
+        # Kiểm tra xem file đã tồn tại trong danh sách chưa để tránh nhân đôi
+        if not any(f.name == uploaded_file.name for f in st.session_state['uploaded_files']):
+            st.session_state['uploaded_files'].append(uploaded_file)
 
-if __name__ == "__main__":
-    toilet_feedback_app()
+def display_file(file):
+    # Xử lý và hiển thị file dựa trên loại file
+    file_type = file.type.split('/')[1]
+    if file_type == "pdf":
+        try:
+            doc = fitz.open(stream=file.getvalue(), filetype="pdf")
+            page = doc.load_page(0)  # Chỉ hiển thị trang đầu tiên của PDF
+            pix = page.get_pixmap()
+            img = pix.tobytes("png")
+            st.image(img)
+        except Exception as e:
+            st.error(f"Could not load PDF file: {e}")
+    elif file_type in ["jpeg", "png", "jpg"]:
+        st.image(file.getvalue())
+    else:
+        st.error("File format not supported.")
+
+# Sidebar với navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ("Home", "Upload document", "Dashboard"))
+
+if page == "Home":
+    st.title("Home Page")
+    st.write("Welcome to the Home Page!")
+
+elif page == "Upload document":
+    st.title("Upload and Preview Document")
+    # Điều chỉnh tỷ lệ cột, ví dụ: cột upload nhỏ hơn, cột preview lớn hơn
+    upload_col, preview_col = st.columns([2, 3])  # Thay đổi tỷ lệ cột ở đây
+
+    with upload_col:
+        st.header("Upload Files")
+        uploaded_file = st.file_uploader("", type=["pdf", "jpeg", "png", "jpg"], help="Upload your file here")
+        if uploaded_file is not None:
+            upload_file(uploaded_file)
+
+        if st.session_state['uploaded_files']:
+            file_names = [f.name for f in st.session_state['uploaded_files']]
+            selected_file_name = st.selectbox("Choose a file to preview", file_names, key="file_selector")
+
+    with preview_col:
+        st.header("Preview")
+        if 'uploaded_files' in st.session_state and st.session_state['uploaded_files']:
+            # Tìm file đã chọn để hiển thị
+            for uploaded_file in st.session_state['uploaded_files']:
+                if uploaded_file.name == st.session_state['file_selector']:
+                    display_file(uploaded_file)
+                    break
+elif page == "Dashboard":
+    st.title("Dashboard")
+    st.write("Dashboard content will be here.")
